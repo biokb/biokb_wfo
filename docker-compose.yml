@@ -1,0 +1,19 @@
+version: "1.0"
+name: biokb_wfo
+
+services:
+  api:
+    build: .
+    container_name: biokb_wfo
+    environment:
+      CONNECTION_STR: ${CONNECTION_STR}
+      NEO4J_URI: "bolt://${NEO4J_HOST}:${NEO4J_PORT_BOLT}"
+    ports:
+      - ${API_PORT}:8000
+    volumes:
+      - ~/.biokb/wfo:/root/.biokb/wfo
+
+networks:
+  default:
+    name: biokb_network
+    external: true
