@@ -128,10 +128,10 @@ async def import_data(
             " ensuring the newest version."
         ),
     ),
-    keep_files: bool = Query(
-        True,
+    delete_files: bool = Query(
+        False,
         description=(
-            "Whether to keep the downloaded files"
+            "Whether to delete the downloaded files"
             " after importing them into the database."
         ),
     ),
@@ -142,7 +142,9 @@ async def import_data(
     """
     try:
         dbm = manager.DbManager()
-        result = dbm.import_data(force_download=force_download, keep_files=keep_files)
+        result = dbm.import_data(
+            force_download=force_download, delete_files=delete_files
+        )
     except Exception as e:
         logger.error(f"Error importing data: {e}")
         raise HTTPException(
@@ -253,13 +255,13 @@ async def names_find_similar(
     """Fuzzy search for similar names using LEVENSHTEIN algorithm."""
 
     columns = (
-        models.Name.name,
-        models.Name.name_alpha,
-        models.Name.name_plain,
-        models.Name.genus,
-        models.Name.family,
-        models.Name.placed_in_genus,
-        models.Name.wfo_id,
+        models.Plant.name,
+        models.Plant.name_alpha,
+        models.Plant.name_plain,
+        models.Plant.genus,
+        models.Plant.family,
+        models.Plant.placed_in_genus,
+        models.Plant.wfo_id,
     )
 
     search_for_name = re.sub(r"\s+", " ", search_for_name.strip())
@@ -270,7 +272,7 @@ async def names_find_similar(
     # First, check for exact match
     # If an exact match is found, return it immediately.
     exact_results = session.execute(
-        stmt.where(models.Name.name_alpha.like(search_for_name))
+        stmt.where(models.Plant.name_alpha.like(search_for_name))
     ).all()
     if exact_results:
         return_values = []
@@ -298,7 +300,7 @@ async def names_find_similar(
 
     # Get names that start with same letter to reduce the dataset for phonetic comparison
     candidate_stmt = session.query(*columns).where(
-        models.Name.name_alpha.like(f"{first_letter}%")
+        models.Plant.name_alpha.like(f"{first_letter}%")
     )
 
     candidates = session.execute(candidate_stmt).all()
@@ -349,7 +351,7 @@ async def names_find_similar(
         search_str = f"{search_for_name}%"
     else:
         search_str = f"{name_splitted[0]}% {name_splitted[1]}%"
-    stmt3 = session.query(*columns).where(models.Name.name_alpha.like(search_str))
+    stmt3 = session.query(*columns).where(models.Plant.name_alpha.like(search_str))
     results = session.execute(stmt3).all()
 
     # check for similarity
@@ -377,8 +379,8 @@ async def names_find_similar(
     if not ratios:
         stmt4 = stmt.where(
             or_(
-                models.Name.name_alpha.like(f"{search_for_name[0]}%"),
-                models.Name.name_alpha.like(f"%{search_for_name[-4:]}"),
+                models.Plant.name_alpha.like(f"{search_for_name[0]}%"),
+                models.Plant.name_alpha.like(f"%{search_for_name[-4:]}"),
             )
         )
         results = session.execute(stmt4).all()

@@ -1,7 +1,8 @@
 [project]
 name = "biokb_wfo"
 version = "0.1.0"
-description = "Default template for PDM package"
+description = """A Python package to import World Flora Online 
+data in relational and graph databases."""
 authors = [
     {name = "Christian Ebeling", email = "Christian.Ebeling@scai.fraunhofer.de"},
 ]
@@ -10,23 +11,106 @@ dependencies = [
     "fastapi[standard]>=0.128.0",
     "jellyfish>=1.2.1",
     "levenshtein>=0.27.3",
+    "neo4j>=6.1.0",
     "pandas>=2.3.3",
     "pymysql>=1.1.2",
+    "rdflib>=7.5.0",
+    "rdflib-neo4j>=1.1",
     "sqlalchemy>=2.0.45",
     "tqdm>=4.67.1",
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "License :: OSI Approved :: MIT License"
+]
+keywords = ["knowledge graph", "knowledge base", "ethnobotany", "taxonomy", "plants"]
 readme = "README.md"
 license = {text = "MIT"}
+
+[project.urls]
+Homepage = "https://biokb-wfo.readthedocs.io"
+Documentation = "https://biokb-wfo.readthedocs.io"
+Repository = "https://github.com/biokb/biokb_wfo"
+Issues = "https://github.com/biokb/biokb_wfo/issues"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
+readthedocs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.1",
+    "mkdocs-jupyter>=0.25.1",
+    "mkdocstrings[python]>=1.0.0",
+]
+dev = [
+    "tox>=4.15.0",
+    "black>=24.4.2",
+    "mypy>=1.19.1",
+    "isort>=7.0.0",
+    "build>=1.3.0",
+    "twine>=6.2.0",
+]
 docs = [
-    "eralchemy[graphviz]>=1.6.0",
+    "eralchemy>=1.6.0",
+    "eralchemy2>=1.4.1",
+    "mkdocs-jupyter>=0.25.1",
+    "mkdocs-material>=9.7.1",
+]
+tests = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "pytest-sugar>=1.1.1",
+    "testcontainers[neo4j]>=4.13.3",
+    "tox>=4.32.0",
 ]
 
+[project.scripts]
+biokb_wfo = "biokb_wfo.cli:main"
 
+[tool.isort]
+profile = "black"
+line_length = 88
+known_first_party = ["biokb_wfo"]
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true  # force type hints on function definitions
+ignore_missing_imports = false
+
+[[tool.mypy.overrides]]
+module = [
+    "neo4j.*",
+    "rdflib_neo4j.*",
+    "rdflib_neo4j"
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = [
+    "ignore:The @wait_container_is_ready decorator is deprecated:DeprecationWarning"
+]
+
+[tool.coverage.run]
+parallel = true
+source = ["biokb_wfo"]
+
+[tool.coverage.paths]
+source = [
+    "src/biokb_wfo",
+    "*/site-packages/biokb_wfo"
+]
 
