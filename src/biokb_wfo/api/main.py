@@ -37,8 +37,8 @@ logging.basicConfig(
 )
 logger: logging.Logger = logging.getLogger(__name__)
 
-USERNAME: str = os.environ.get("API_USERNAME", "admin")
-PASSWORD: str = os.environ.get("API_PASSWORD", "admin")
+USERNAME: str = os.environ.get("WFO_API_USERNAME", "admin")
+PASSWORD: str = os.environ.get("WFO_API_PASSWORD", "admin")
 
 
 def get_engine() -> Engine:
