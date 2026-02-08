@@ -77,7 +77,6 @@ def _build_dynamic_query(
 
         # STRING ......................................................................
         if origin is str:
-            logger.info("used string filter")
             filters.append(column.like(value) if ("%" in value) else column == value)
 
         # NUMBERS .....................................................................
@@ -112,8 +111,6 @@ def _build_dynamic_query(
         stmt = stmt.limit(limit)
     if offset is not None:
         stmt = stmt.offset(offset)
-
-    logger.info(stmt.compile(compile_kwargs={"literal_binds": True}))
 
     return {
         "count": total_count,
