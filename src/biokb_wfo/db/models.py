@@ -1,7 +1,9 @@
-from curses.ascii import TAB
+import enum
 from typing import Optional
 
-from sqlalchemy import BigInteger, ForeignKey, String, Text
+from sqlalchemy import BigInteger
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from biokb_wfo.constants import TABLE_PREFIX
@@ -11,24 +13,83 @@ class Base(DeclarativeBase):
     pass
 
 
+class RoleEnums(enum.Enum):
+    ROLE = "role"
+    ACCEPTED = "accepted"
+    UNPLACED = "unplaced"
+    SYNONYM = "synonym"
+    DEPRECATED = "deprecated"
+
+
+class StatusEnums(enum.Enum):
+    VALID = "valid"
+    UNKNOWN = "unknown"
+    INVALID = "invalid"
+    DEPRECATED = "deprecated"
+    ILLEGITIMATE = "illegitimate"
+    REJECTED = "rejected"
+    ORTHOVAR = "orthovar"
+    CONSERVED = "conserved"
+    SUPERFLUOUS = "superfluous"
+    SANCTIONED = "sanctioned"
+
+
+class RankEnums(enum.Enum):
+    CODE = "code"
+    VARIETY = "variety"
+    SPECIES = "species"
+    FORM = "form"
+    SUBSPECIES = "subspecies"
+    UNRANKED = "unranked"
+    PROLE = "prole"
+    SUBVARIETY = "subvariety"
+    LUSUS = "lusus"
+    SUBFORM = "subform"
+    SECTION = "section"
+    SUBSERIES = "subseries"
+    SERIES = "series"
+    SUBSECTION = "subsection"
+    SUBGENUS = "subgenus"
+    GENUS = "genus"
+    FAMILY = "family"
+    TRIBE = "tribe"
+    SUBTRIBE = "subtribe"
+    SUPERTRIBE = "supertribe"
+    SUBFAMILY = "subfamily"
+    ORDER = "order"
+    SUPERORDER = "superorder"
+    SUBCLASS = "subclass"
+    CLASS = "class"
+    PHYLUM = "phylum"
+    KINGDOM = "kingdom"
+    SUBORDER = "suborder"
+    SUBKINGDOM = "subkingdom"
+
+
 class Name(Base):
     __tablename__ = TABLE_PREFIX + "name"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     citation: Mapped[Optional[str]] = mapped_column(Text)
-    full_name: Mapped[Optional[str]] = mapped_column(Text)
-    full_name_no_authors: Mapped[Optional[str]] = mapped_column(Text)
-    full_name_plain: Mapped[Optional[str]] = mapped_column(Text)
-    genus_string: Mapped[Optional[str]] = mapped_column(Text)
+    full_name: Mapped[str] = mapped_column(String(255), index=True)
+    full_name_no_authors: Mapped[str] = mapped_column(String(255))
+    full_name_plain: Mapped[Optional[str]] = mapped_column(String(255), index=True)
+    genus_string: Mapped[Optional[str]] = mapped_column(String(255))
     hybrid_taxon: Mapped[Optional[bool]]
-    ipni: Mapped[Optional[str]] = mapped_column(String(50))
-    name: Mapped[Optional[str]] = mapped_column(Text)
-    status: Mapped[Optional[str]] = mapped_column(Text)
+    ipni: Mapped[Optional[str]] = mapped_column(String(50), index=True)
+    name: Mapped[Optional[str]] = mapped_column(String(255))
+    status: Mapped[str] = mapped_column(
+        SQLEnum(*[e.value for e in StatusEnums]), index=True
+    )
     parent_id: Mapped[Optional[str]] = mapped_column(String(50))
     year: Mapped[Optional[int]]
-    rank: Mapped[Optional[str]] = mapped_column(String(50))
-    role: Mapped[Optional[str]] = mapped_column(String(50))
+    rank: Mapped[str] = mapped_column(
+        SQLEnum(*[e.value for e in RankEnums]), index=True
+    )
+    role: Mapped[str] = mapped_column(
+        SQLEnum(*[e.value for e in RoleEnums]), index=True
+    )
     species_string: Mapped[Optional[str]] = mapped_column(Text)
 
     # Foreign keys to taxonomic ranks

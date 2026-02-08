@@ -5,6 +5,8 @@ from typing import Optional
 import click
 from sqlalchemy import create_engine
 
+from biokb_wfo.api.main import run_api
+
 from biokb_wfo import __version__
 from biokb_wfo.constants import DB_DEFAULT_CONNECTION_STR, NEO4J_URI, NEO4J_USER
 from biokb_wfo.db.manager import DbManager
@@ -118,6 +120,30 @@ def import_neo4j(uri: str, user: str, password: Optional[str]) -> None:
             "It is not recommended to provide the Neo4j password via command line."
         )
     Neo4jImporter(neo4j_uri=uri, neo4j_user=user, neo4j_pwd=password).import_ttls()
+
+
+@main.command("run-server")
+@click.option(
+    "--host", "-h", default="0.0.0.0", help="API server host [default: 0.0.0.0]"
+)
+@click.option("--port", "-P", default=8000, help="API server port [default: 8000]")
+@click.option("--user", "-u", default="admin", help="API username [default=admin]")
+@click.option("--password", "-p", default="admin", help="API password [default: admin]")
+def run_server(host: str, port: int, user: str, password: str) -> None:
+    """Run the API server.
+
+    Args:
+        host (str): API server host
+        port (int): API server port
+        user (str): API username
+        password (str): API password
+    """
+    # set env variables for API authentication
+    os.environ["API_USER"] = user
+    os.environ["API_PASSWORD"] = password
+    host_shown = "127.0.0.1" if host == "0.0.0.0" else host
+    click.echo(f"API server running at http://{host_shown}:{port}/docs#/")
+    run_api(host=host, port=port)
 
 
 if __name__ == "__main__":

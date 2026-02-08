@@ -4,8 +4,7 @@ import re
 import secrets
 from contextlib import asynccontextmanager
 from difflib import SequenceMatcher
-from select import select
-from typing import Annotated, AsyncGenerator, Generator
+from typing import Annotated, AsyncGenerator, Generator, List
 
 import jellyfish
 import Levenshtein
@@ -14,6 +13,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from pydantic import Field
 from sqlalchemy import Engine, create_engine, or_
 from sqlalchemy.orm import Session
 
@@ -28,9 +28,8 @@ from biokb_wfo.constants import (
     ZIPPED_TTLS_PATH,
 )
 from biokb_wfo.db import manager, models
-
-# from biokb_wfo.rdf.neo4j_importer import Neo4jImporter
-# from biokb_wfo.rdf.turtle import TurtleCreator
+from biokb_wfo.rdf.neo4j_importer import Neo4jImporter
+from biokb_wfo.rdf.turtle import TurtleCreator
 
 # Configure logging
 logging.basicConfig(
@@ -88,7 +87,7 @@ app.add_middleware(
 )
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8000) -> None:
+def run_api(host: str = "0.0.0.0", port: int = 8000) -> None:
     uvicorn.run(
         app="biokb_wfo.api.main:app",
         host=host,
@@ -154,68 +153,68 @@ async def import_data(
     return result
 
 
-# @app.get("/export_ttls/", tags=[Tag.DBMANAGE])
-# async def get_report(
-#     credentials: HTTPBasicCredentials = Depends(verify_credentials),
-#     force_create: bool = Query(
-#         False,
-#         description="Whether to re-generate the TTL files even if they already exist.",
-#     ),
-# ) -> FileResponse:
+@app.get("/export_ttls/", tags=[Tag.DBMANAGE])
+async def get_report(
+    credentials: HTTPBasicCredentials = Depends(verify_credentials),
+    force_create: bool = Query(
+        False,
+        description="Whether to re-generate the TTL files even if they already exist.",
+    ),
+) -> FileResponse:
 
-#     file_path = ZIPPED_TTLS_PATH
-#     if not os.path.exists(file_path) or force_create:
-#         try:
-#             TurtleCreator().create_ttls()
-#         except Exception as e:
-#             logger.error(f"Error generating TTL files: {e}")
-#             raise HTTPException(
-#                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#                 detail="Error generating TTL files. Data already imported?",
-#             ) from e
-#     return FileResponse(
-#         path=file_path, filename="chebi_ttls.zip", media_type="application/zip"
-#     )
+    file_path = ZIPPED_TTLS_PATH
+    if not os.path.exists(file_path) or force_create:
+        try:
+            TurtleCreator().create_ttls()
+        except Exception as e:
+            logger.error(f"Error generating TTL files: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Error generating TTL files. Data already imported?",
+            ) from e
+    return FileResponse(
+        path=file_path, filename="chebi_ttls.zip", media_type="application/zip"
+    )
 
 
-# @app.get("/import_neo4j/", tags=[Tag.DBMANAGE])
-# async def import_neo4j(
-#     credentials: HTTPBasicCredentials = Depends(verify_credentials),
-#     uri: str | None = Query(
-#         NEO4J_URI,
-#         description="The Neo4j URI. If not provided, "
-#         "the default from environment variable is used.",
-#     ),
-#     user: str | None = Query(
-#         NEO4J_USER,
-#         description="The Neo4j user. If not provided,"
-#         " the default from environment variable is used.",
-#     ),
-#     password: str | None = Query(
-#         NEO4J_PASSWORD,
-#         description="The Neo4j password. If not provided,"
-#         " the default from environment variable is used.",
-#     ),
-# ) -> dict[str, str]:
-#     """Import RDF turtle files in Neo4j."""
-#     try:
-#         if not os.path.exists(ZIPPED_TTLS_PATH):
-#             raise HTTPException(
-#                 status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
-#                 detail=(
-#                     "Zipped TTL files not found. Please "
-#                     "generate them first using /export_ttls/ endpoint."
-#                 ),
-#             )
-#         importer = Neo4jImporter(neo4j_uri=uri, neo4j_user=user, neo4j_pwd=password)
-#         importer.import_ttls()
-#     except Exception as e:
-#         logger.error(f"Error importing data into Neo4j: {e}")
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"Error importing data into Neo4j: {e}",
-#         ) from e
-#     return {"status": "Neo4j import completed successfully."}
+@app.get("/import_neo4j/", tags=[Tag.DBMANAGE])
+async def import_neo4j(
+    credentials: HTTPBasicCredentials = Depends(verify_credentials),
+    uri: str | None = Query(
+        NEO4J_URI,
+        description="The Neo4j URI. If not provided, "
+        "the default from environment variable is used.",
+    ),
+    user: str | None = Query(
+        NEO4J_USER,
+        description="The Neo4j user. If not provided,"
+        " the default from environment variable is used.",
+    ),
+    password: str | None = Query(
+        NEO4J_PASSWORD,
+        description="The Neo4j password. If not provided,"
+        " the default from environment variable is used.",
+    ),
+) -> dict[str, str]:
+    """Import RDF turtle files in Neo4j."""
+    try:
+        if not os.path.exists(ZIPPED_TTLS_PATH):
+            raise HTTPException(
+                status_code=status.HTTP_405_METHOD_NOT_ALLOWED,
+                detail=(
+                    "Zipped TTL files not found. Please "
+                    "generate them first using /export_ttls/ endpoint."
+                ),
+            )
+        importer = Neo4jImporter(neo4j_uri=uri, neo4j_user=user, neo4j_pwd=password)
+        importer.import_ttls()
+    except Exception as e:
+        logger.error(f"Error importing data into Neo4j: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error importing data into Neo4j: {e}",
+        ) from e
+    return {"status": "Neo4j import completed successfully."}
 
 
 # tag: Name
@@ -252,41 +251,31 @@ async def names_find_similar(
         ..., description="Name to search for", example="acHila meliflium"
     ),
 ):
-    """Fuzzy search for similar names using LEVENSHTEIN algorithm."""
 
-    columns = (
-        models.Plant.name,
-        models.Plant.name_alpha,
-        models.Plant.name_plain,
-        models.Plant.genus,
-        models.Plant.family,
-        models.Plant.placed_in_genus,
-        models.Plant.wfo_id,
-    )
-
-    search_for_name = re.sub(r"\s+", " ", search_for_name.strip())
+    search_for_name = re.sub(rf"\s+", " ", search_for_name.strip())
     name_splitted = [x.strip() for x in search_for_name.split(" ")]
 
-    stmt = session.query(*columns)
+    exact_results = (
+        session.query(models.Name)
+        .where(models.Name.full_name_plain.like(search_for_name))
+        .all()
+    )
 
     # First, check for exact match
     # If an exact match is found, return it immediately.
-    exact_results = session.execute(
-        stmt.where(models.Plant.name_alpha.like(search_for_name))
-    ).all()
+
     if exact_results:
-        return_values = []
+        return_values: list[schemas.SimilarNameSearchResult] = []
         for exact_result in exact_results:
             return_values.append(
                 schemas.SimilarNameSearchResult(
+                    id=exact_result.id,
+                    full_name=exact_result.full_name,
+                    status=exact_result.status,
+                    rank=exact_result.rank,
+                    year=exact_result.year,
+                    ipni=exact_result.ipni,
                     calculate_with="exact",
-                    name=exact_result.name,
-                    name_alpha=exact_result.name_alpha,
-                    name_plain=exact_result.name_plain,
-                    genus=exact_result.genus,
-                    family=exact_result.family,
-                    placed_in_genus=exact_result.placed_in_genus,
-                    wfo_id=exact_result.wfo_id,
                     similarity=1.0,
                 )
             )
@@ -299,113 +288,570 @@ async def names_find_similar(
     first_letter = search_for_name[0].upper()
 
     # Get names that start with same letter to reduce the dataset for phonetic comparison
-    candidate_stmt = session.query(*columns).where(
-        models.Plant.name_alpha.like(f"{first_letter}%")
+    candidates: List[models.Name] = (
+        session.query(models.Name)
+        .where(models.Name.full_name_plain.like(f"{first_letter}%"))
+        .all()
     )
 
-    candidates = session.execute(candidate_stmt).all()
-
     # Filter candidates by Metaphone similarity and Jaro-Winkler
-    phonetic_matches = []
+    phonetic_matches: list[schemas.SimilarNameSearchResult] = []
     for candidate in candidates:
-        candidate_metaphone = jellyfish.metaphone(candidate.name_alpha)
+        candidate_metaphone = jellyfish.metaphone(candidate.full_name)
 
         # Check if metaphone codes match
         metaphone_match = name_metaphone == candidate_metaphone
 
         # Also check Jaro-Winkler similarity for scientific names (good for genus/species prefixes)
         jaro_similarity = jellyfish.jaro_winkler_similarity(
-            search_for_name.lower(), candidate.name_alpha.lower()
+            search_for_name.lower(), candidate.full_name.lower()
         )
 
         if metaphone_match or jaro_similarity > 0.8:
             # Calculate combined similarity score
             sequence_ratio = SequenceMatcher(
-                None, search_for_name.lower(), candidate.name_alpha.lower()
+                None, search_for_name.lower(), candidate.full_name.lower()
             ).ratio()
             final_similarity = max(jaro_similarity, sequence_ratio)
 
             if final_similarity > 0.5:
-                phonetic_matches.append(
-                    schemas.SimilarNameSearchResult(
-                        calculate_with="metaphone_jaro",
-                        name=candidate.name,
-                        name_alpha=candidate.name_alpha,
-                        name_plain=candidate.name_plain,
-                        genus=candidate.genus,
-                        family=candidate.family,
-                        placed_in_genus=candidate.placed_in_genus,
-                        wfo_id=candidate.wfo_id,
-                        similarity=round(final_similarity, 2),
-                    )
+                phonetic_match = schemas.SimilarNameSearchResult(
+                    id=candidate.id,
+                    full_name=candidate.full_name,
+                    status=candidate.status,
+                    rank=candidate.rank,
+                    year=candidate.year,
+                    ipni=candidate.ipni,
+                    calculate_with="metaphone_jaro",
+                    similarity=round(final_similarity, 2),
                 )
+                phonetic_matches.append(phonetic_match)
 
     if phonetic_matches:
         return sorted(phonetic_matches, key=lambda x: x.similarity, reverse=True)[:30]
 
     results = []
-    ratios = []
+    sequence_matches: list[schemas.SimilarNameSearchResult] = []
     # If no phonetic matches, fall back to pattern-based search with Levenshtein distance
 
     if len(name_splitted) < 2:
         search_str = f"{search_for_name}%"
     else:
         search_str = f"{name_splitted[0]}% {name_splitted[1]}%"
-    stmt3 = session.query(*columns).where(models.Plant.name_alpha.like(search_str))
-    results = session.execute(stmt3).all()
+
+    results: List[models.Name] = (
+        session.query(models.Name).where(models.Name.full_name.like(search_str)).all()
+    )
 
     # check for similarity
 
     for result in results:
-        ratio = SequenceMatcher(None, search_for_name, result.name_alpha).ratio()
+        ratio = SequenceMatcher(None, search_for_name, result.full_name).ratio()
         if ratio > 0.3:  # Threshold for similarity
-            ratios.append(
+            sequence_matches.append(
                 schemas.SimilarNameSearchResult(
-                    calculate_with="pattern_match",
-                    name=result.name,
-                    name_alpha=result.name_alpha,
-                    name_plain=result.name_plain,
-                    genus=result.genus,
-                    family=result.family,
-                    placed_in_genus=result.placed_in_genus,
-                    wfo_id=result.wfo_id,
+                    id=result.id,
+                    full_name=result.full_name,
+                    status=result.status,
+                    rank=result.rank,
+                    year=result.year,
+                    ipni=result.ipni,
+                    calculate_with="sequence_matcher",
                     similarity=round(ratio, 2),
                 )
             )
-    if ratios:
-        return sorted(ratios, key=lambda x: x.similarity, reverse=True)
+    if sequence_matches:
+        return sorted(sequence_matches, key=lambda x: x.similarity, reverse=True)
 
-    # if no results Levenshtein
-    if not ratios:
-        stmt4 = stmt.where(
+    # if no results sequence_matcher
+    lstein_matches: list[schemas.SimilarNameSearchResult] = []
+    results = (
+        session.query(models.Name)
+        .where(
             or_(
-                models.Plant.name_alpha.like(f"{search_for_name[0]}%"),
-                models.Plant.name_alpha.like(f"%{search_for_name[-4:]}"),
+                models.Name.full_name.like(f"{search_for_name[0]}%"),
+                models.Name.full_name.like(f"%{search_for_name[-4:]}"),
             )
         )
-        results = session.execute(stmt4).all()
+        .all()
+    )
 
-        for result in results:
-            ratio = Levenshtein.ratio(search_for_name, result.name_alpha)
-            if ratio > 0.3:
-                ratios.append(
-                    schemas.SimilarNameSearchResult(
-                        calculate_with="levenshtein",
-                        name=result.name,
-                        name_alpha=result.name_alpha,
-                        name_plain=result.name_plain,
-                        genus=result.genus,
-                        family=result.family,
-                        placed_in_genus=result.placed_in_genus,
-                        wfo_id=result.wfo_id,
-                        similarity=round(ratio, 2),  # Convert to percentage
-                    )
+    for result in results:
+        ratio = Levenshtein.ratio(search_for_name, result.full_name)
+        if ratio > 0.3:
+            lstein_matches.append(
+                schemas.SimilarNameSearchResult(
+                    id=result.id,
+                    full_name=result.full_name,
+                    status=result.status,
+                    rank=result.rank,
+                    year=result.year,
+                    ipni=result.ipni,
+                    calculate_with="levenshtein",
+                    similarity=round(ratio, 2),
                 )
-        if ratios:
-            return sorted(ratios, key=lambda x: x.similarity, reverse=True)[:3]
+            )
+    if lstein_matches:
+        return sorted(lstein_matches, key=lambda x: x.similarity, reverse=True)[:3]
 
     if not results:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Name '{search_for_name}' not found.",
         )
+
+
+@app.get("/species/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_species(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search species.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Species,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/genus/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_genus(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search genus.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Genus,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/tribe/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_tribe(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search tribe.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Tribe,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/family/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_family(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search family.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Family,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/order/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_order(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search order.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Order,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/phylum/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_phylum(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search phylum.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Phylum,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subkingdom/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subkingdom(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subkingdom.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subkingdom,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/kingdom/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_kingdom(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search kingdom.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Kingdom,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/section/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_section(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search section.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Section,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subgenus/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subgenus(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subgenus.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subgenus,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subspecies/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subspecies(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subspecies.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subspecies,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/variety/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_variety(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search variety.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Variety,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subtribe/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subtribe(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subtribe.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subtribe,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subclass/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subclass(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subclass.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subclass,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/classification/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_classification(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search classification.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Classification,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subfamily/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subfamily(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subfamily.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subfamily,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/superorder/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_superorder(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search superorder.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Superorder,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/series/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_series(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search series.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Series,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subsection/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subsection(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subsection.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subsection,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/supertribe/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_supertribe(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search supertribe.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Supertribe,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subvariety/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subvariety(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subvariety.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subvariety,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subseries/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subseries(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subseries.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subseries,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/subform/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_subform(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search subform.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Subform,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@app.get("/prole/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])
+async def search_prole(
+    search: schemas.TaxonSearch = Depends(),
+    offset: int = 0,
+    limit: Annotated[int, Query(le=100)] = 10,
+    session: Session = Depends(get_session),
+) -> SASearchResults | dict[str, str]:
+    """
+    Search prole.
+    """
+    return build_dynamic_query(
+        search_obj=search,
+        model_cls=models.Prole,
+        session=session,
+        limit=limit,
+        offset=offset,
+    )
