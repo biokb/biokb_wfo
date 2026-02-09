@@ -4,7 +4,7 @@ import re
 import secrets
 from contextlib import asynccontextmanager
 from difflib import SequenceMatcher
-from typing import Annotated, AsyncGenerator, Generator, List
+from typing import Annotated, AsyncGenerator, Generator, List, Optional
 
 import jellyfish
 import Levenshtein
@@ -248,16 +248,38 @@ async def search_names(
 async def names_find_similar(
     session: Session = Depends(get_session),
     search_for_name: str = Query(
-        ..., description="Name to search for", example="acHila meliflium"
+        ...,
+        description="Name to search for",
+        openapi_examples={
+            "example 1": {"value": "acHila meliflium"},
+            "example 2": {"value": "Almue Fera"},
+        },
     ),
-):
+    status_: models.StatusEnums | None = Query(
+        None,
+        description="status",
+    ),
+    rank: models.RankEnums | None = Query(
+        None,
+        description="rank",
+    ),
+    role: models.RoleEnums | None = Query(
+        None,
+        description="role",
+    ),
+) -> List[schemas.SimilarNameSearchResult] | schemas.NoneType:
 
     search_for_name = re.sub(rf"\s+", " ", search_for_name.strip())
     name_splitted = [x.strip() for x in search_for_name.split(" ")]
 
+    filters = []
+    filters += [models.Name.status == status_.value] if status_ else []
+    filters += [models.Name.rank == rank.value] if rank else []
+    filters += [models.Name.role == role.value] if role else []
+
     exact_results = (
         session.query(models.Name)
-        .where(models.Name.full_name_plain.like(search_for_name))
+        .where(models.Name.full_name_plain.like(search_for_name), *filters)
         .all()
     )
 
@@ -272,6 +294,7 @@ async def names_find_similar(
                     id=exact_result.id,
                     full_name=exact_result.full_name,
                     status=exact_result.status,
+                    role=exact_result.role,
                     rank=exact_result.rank,
                     year=exact_result.year,
                     ipni=exact_result.ipni,
@@ -290,7 +313,7 @@ async def names_find_similar(
     # Get names that start with same letter to reduce the dataset for phonetic comparison
     candidates: List[models.Name] = (
         session.query(models.Name)
-        .where(models.Name.full_name_plain.like(f"{first_letter}%"))
+        .where(models.Name.full_name_plain.like(f"{first_letter}%"), *filters)
         .all()
     )
 
@@ -319,6 +342,7 @@ async def names_find_similar(
                     id=candidate.id,
                     full_name=candidate.full_name,
                     status=candidate.status,
+                    role=candidate.role,
                     rank=candidate.rank,
                     year=candidate.year,
                     ipni=candidate.ipni,
@@ -340,7 +364,9 @@ async def names_find_similar(
         search_str = f"{name_splitted[0]}% {name_splitted[1]}%"
 
     results: List[models.Name] = (
-        session.query(models.Name).where(models.Name.full_name.like(search_str)).all()
+        session.query(models.Name)
+        .where(models.Name.full_name.like(search_str), *filters)
+        .all()
     )
 
     # check for similarity
@@ -356,6 +382,7 @@ async def names_find_similar(
                     rank=result.rank,
                     year=result.year,
                     ipni=result.ipni,
+                    role=result.role,
                     calculate_with="sequence_matcher",
                     similarity=round(ratio, 2),
                 )
@@ -371,7 +398,8 @@ async def names_find_similar(
             or_(
                 models.Name.full_name.like(f"{search_for_name[0]}%"),
                 models.Name.full_name.like(f"%{search_for_name[-4:]}"),
-            )
+            ),
+            *filters,
         )
         .all()
     )
@@ -384,6 +412,7 @@ async def names_find_similar(
                     id=result.id,
                     full_name=result.full_name,
                     status=result.status,
+                    role=result.role,
                     rank=result.rank,
                     year=result.year,
                     ipni=result.ipni,

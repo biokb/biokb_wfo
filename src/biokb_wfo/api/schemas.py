@@ -3,6 +3,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from biokb_wfo.db import models
+
 # ============================================
 # Taxonomy Rank Schemas
 # ============================================
@@ -276,11 +278,20 @@ class NameSearch(BaseModel):
     hybrid_taxon: Optional[bool] = None
     ipni: Optional[str] = None
     name: Optional[str] = None
-    status: Optional[str] = None
+    status: Optional[models.StatusEnums] = Field(
+        None,
+        description="status",
+    )
     parent_id: Optional[str] = None
     year: Optional[int] = None
-    rank: Optional[str] = None
-    role: Optional[str] = None
+    rank: Optional[models.RankEnums] = Field(
+        None,
+        description="rank",
+    )
+    role: Optional[models.RoleEnums] = Field(
+        None,
+        description="role",
+    )
     species_string: Optional[str] = None
     code_id: Optional[int] = None
     species_id: Optional[int] = None
@@ -423,6 +434,7 @@ class SimilarNameSearchResult(BaseModel):
     full_name: str
     status: str
     rank: str
+    role: str
     year: Optional[int] = None
     ipni: Optional[str] = None
     calculate_with: Literal[
