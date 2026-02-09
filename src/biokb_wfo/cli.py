@@ -5,9 +5,8 @@ from typing import Optional
 import click
 from sqlalchemy import create_engine
 
-from biokb_wfo.api.main import run_api
-
 from biokb_wfo import __version__
+from biokb_wfo.api.main import run_api
 from biokb_wfo.constants import DB_DEFAULT_CONNECTION_STR, NEO4J_URI, NEO4J_USER
 from biokb_wfo.db.manager import DbManager
 from biokb_wfo.rdf.neo4j_importer import Neo4jImporter
@@ -17,9 +16,9 @@ from biokb_wfo.rdf.turtle import TurtleCreator
 def setup_logging(ctx, param, value):
     # Only set up logging if the user actually asks for it
     if value == 1:
-        logging.getLogger("biokb_ipni").setLevel(logging.INFO)
+        logging.getLogger("biokb_wfo").setLevel(logging.INFO)
     elif value >= 2:
-        logging.getLogger("biokb_ipni").setLevel(logging.DEBUG)
+        logging.getLogger("biokb_wfo").setLevel(logging.DEBUG)
 
     # We must add a handler so the logs actually print to the screen
     if value > 0:
