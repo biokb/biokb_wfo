@@ -11,6 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Optional
 
+import ijson
 import pandas as pd
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -56,6 +57,7 @@ class DbManager:
         logger.info("Engine: %s", self.__engine)
         self.Session: sessionmaker[Session] = sessionmaker(bind=self.__engine)
         self.cache_ids: Dict[str, Dict[str, int]] = {}
+        self.mapper = PLACE_IN_FIELDS | COLUMN_MAPPINGS
 
     @property
     def session(self) -> Session:
@@ -121,16 +123,12 @@ class DbManager:
         data = defaultdict(set)
         file_name = Path(zip_path).name.split(".zip")[0]
 
+        logger.info(f"Inserting PLACE_IN_FIELDS data into database...")
         with zipfile.ZipFile(zip_path, "r") as z:
             with z.open(file_name) as f:
-                for line in f:
-                    line = line.decode("utf-8").strip()
-                    if line.strip() in ["[", "]"]:
-                        continue
-                    line = line.strip().strip(",")
-                    row = json.loads(line)
-                    for key in [x for x in row.keys() if x in PLACE_IN_FIELDS]:
-                        data[PLACE_IN_FIELDS[key]].add(row[key])
+                for item in ijson.items(f, "item"):
+                    for key in [x for x in item.keys() if x in PLACE_IN_FIELDS]:
+                        data[PLACE_IN_FIELDS[key]].add(item[key])
 
         inserted_counts = {}
         for k in data:
@@ -152,23 +150,29 @@ class DbManager:
         return inserted_counts
 
     def __insert_names(self, zip_path: str) -> Dict[str, int]:
-        mapper = PLACE_IN_FIELDS | COLUMN_MAPPINGS
         file_name = Path(zip_path).name.split(".zip")[0]
         rows = []
 
+        logger.info(f"Inserting names data into database...")
         with zipfile.ZipFile(zip_path, "r") as z:
             with z.open(file_name) as f:
-                for line in f:
-                    line = line.decode("utf-8").strip()
-                    if line.strip() in ["[", "]"]:
-                        continue
-                    line = line.strip(",")
-                    row = json.loads(line)
-                    row = {k: v for k, v in row.items() if k in mapper}
+                counter = 0
+                for item in ijson.items(f, "item"):
+                    counter += 1
+                    if counter % 100000 == 0:
+                        self.__insert_names_from_rows(rows)
+                        rows = []
+                    row = {k: v for k, v in item.items() if k in self.mapper}
                     rows.append(row)
+                if rows:
+                    self.__insert_names_from_rows(rows)
+        return {"name": counter}
+
+    def __insert_names_from_rows(self, rows):
+        """Insert names data into database."""
 
         df = pd.DataFrame(rows)
-        df: pd.DataFrame = df.rename(columns=mapper)
+        df: pd.DataFrame = df.rename(columns=self.mapper)
         df["id"] = df["id"].str.replace("wfo-", "").astype(int)
         df["parent_id"] = (
             df["parent_id_temp"].str.extract(r"wfo-(\d+)-").astype("Int64")
@@ -177,16 +181,17 @@ class DbManager:
         df["ipni"] = df["ipni"].str.extract(r"urn:lsid:ipni.org:names:(\d+-\d+)")
 
         for column in PLACE_IN_FIELDS.values():
+            if column not in df.columns:
+                continue
             df[f"{column}_id"] = df[column].map(self.cache_ids[column]).astype("Int64")
             df.drop(columns=[column], inplace=True)
 
-        inserted = inserts = df.to_sql(
+        df.to_sql(
             name="wfo_name",
             con=self.__engine,
             if_exists="append",
             index=False,
         )
-        return {"name": inserted or 0}
 
 
 def import_data(
