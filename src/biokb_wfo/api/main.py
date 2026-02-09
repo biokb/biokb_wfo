@@ -227,7 +227,7 @@ async def search_names(
     offset: int = 0,
     limit: Annotated[int, Query(le=100)] = 10,
     session: Session = Depends(get_session),
-) -> SASearchResults | dict[str, str]:
+):
     """
     Search compounds.
     """

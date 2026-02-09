@@ -396,7 +396,7 @@ class NameSearchResults(BaseModel):
     count: int
     offset: int
     limit: int
-    results: list[Name]
+    results: list[NameWithRelationships]
 
 
 class Taxon(BaseModel):
