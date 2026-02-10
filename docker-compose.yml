@@ -52,6 +52,7 @@ services:
     
   wfo:
     build: .
+    container_name: biokb_wfo
     image: biokb_wfo_api:latest
     ports:
       - "${WFO_API_PORT}:8000"
