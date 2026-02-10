@@ -54,7 +54,7 @@ services:
     build: .
     image: biokb_wfo_api:latest
     ports:
-      - 8000:8000
+      - "${WFO_API_PORT}:8000"
     environment:
       MYSQL_CONNECTION_STR: ${CONNECTION_STR}
       NEO4J_URI: ${NEO4J_URI}
