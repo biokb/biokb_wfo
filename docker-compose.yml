@@ -61,6 +61,9 @@ services:
       NEO4J_URI: ${NEO4J_URI}
       NEO4J_USER: ${NEO4J_USER}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
+      WFO_API_USERNAME: ${WFO_API_USERNAME}
+      WFO_API_PASSWORD: ${WFO_API_PASSWORD}
+      
     volumes:
       - ${BIOKB_FOLDER}:/root/.biokb
 
