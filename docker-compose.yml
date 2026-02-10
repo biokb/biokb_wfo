@@ -49,22 +49,27 @@ services:
       PMA_PORT: 3306
     ports:
       - "${PHPMYADMIN_PORT}:80"
-      
+    
   wfo:
     build: .
-    container_name: biokb_wfo
-    environment:
-      CONNECTION_STR: ${CONNECTION_STR}
-      NEO4J_URI: "bolt://${NEO4J_HOST}:${NEO4J_PORT_BOLT}"
+    image: biokb_wfo_api:latest
     ports:
-      - ${API_PORT}:8000
+      - 8000:8000
+    environment:
+      MYSQL_CONNECTION_STR: ${CONNECTION_STR}
+      NEO4J_URI: ${NEO4J_URI}
+      NEO4J_USER: ${NEO4J_USER}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD}
     volumes:
-      - ~/.biokb/wfo:/root/.biokb/wfo
+      - ${BIOKB_FOLDER}:/root/.biokb
+    networks:
+      - biokb_network
 
 volumes:
   mysql_data:
   neo4j_data:
-
+  biokb_data:
+  
 networks:
   default:
     name: biokb_network
