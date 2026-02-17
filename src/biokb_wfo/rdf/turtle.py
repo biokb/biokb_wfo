@@ -1,14 +1,11 @@
-"""Module to create RDF turtle files from the ChEBI imported data."""
+"""Module to create RDF turtle files from the imported data."""
 
 import logging
 import os.path
-import re
 import shutil
-from collections.abc import Callable
 from typing import Optional
 
-import pandas as pd
-from rdflib import RDF, XSD, Graph, Literal, URIRef
+from rdflib import RDF, XSD, Graph, Literal
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import sessionmaker
 from tqdm import tqdm
