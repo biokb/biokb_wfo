@@ -4,7 +4,7 @@ import re
 import secrets
 from contextlib import asynccontextmanager
 from difflib import SequenceMatcher
-from typing import Annotated, AsyncGenerator, Generator, List, Optional
+from typing import Annotated, AsyncGenerator, Generator, List
 
 import jellyfish
 import Levenshtein
@@ -13,7 +13,6 @@ from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from pydantic import Field
 from sqlalchemy import Engine, create_engine, or_
 from sqlalchemy.orm import Session
 
@@ -68,7 +67,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 description = (
     "A RESTful API for BioKB-WFO. This is not an official WFO API."
-    " Please refer to [EBI for official WFO services](https://www.ebi.ac.uk/chebi/)"
+    " Please refer to [World Flora Online website](https://www.worldfloraonline.org)"
 )
 
 app = FastAPI(
@@ -173,7 +172,7 @@ async def get_report(
                 detail="Error generating TTL files. Data already imported?",
             ) from e
     return FileResponse(
-        path=file_path, filename="chebi_ttls.zip", media_type="application/zip"
+        path=file_path, filename="wfo_ttls.zip", media_type="application/zip"
     )
 
 
@@ -227,7 +226,7 @@ async def search_names(
     offset: int = 0,
     limit: Annotated[int, Query(le=100)] = 10,
     session: Session = Depends(get_session),
-):
+) -> SASearchResults | dict[str, str]:
     """
     Search compounds.
     """
@@ -267,10 +266,10 @@ async def names_find_similar(
         None,
         description="role",
     ),
-) -> List[schemas.SimilarNameSearchResult] | schemas.NoneType:
+) -> list[schemas.SimilarNameSearchResult] | None:
 
-    search_for_name = re.sub(rf"\s+", " ", search_for_name.strip())
-    name_splitted = [x.strip() for x in search_for_name.split(" ")]
+    search_for_name = re.sub(r"\s+", " ", search_for_name.strip())
+    name_splitted: List[str] = [x.strip() for x in search_for_name.split(" ")]
 
     filters = []
     filters += [models.Name.status == status_.value] if status_ else []
@@ -305,12 +304,14 @@ async def names_find_similar(
         return return_values
 
     # If no exact match, use phonetic similarity with Metaphone algorithm
-    # Metaphone is better than soundex for non-English names including Latin scientific names
+    # Metaphone is better than soundex for non-English names including
+    # Latin scientific names
     # Also try Jaro-Winkler which works well for scientific names with shared prefixes
     name_metaphone = jellyfish.metaphone(search_for_name)
     first_letter = search_for_name[0].upper()
 
-    # Get names that start with same letter to reduce the dataset for phonetic comparison
+    # Get names that start with same letter to reduce the dataset for
+    # phonetic comparison
     candidates: List[models.Name] = (
         session.query(models.Name)
         .where(models.Name.full_name_plain.like(f"{first_letter}%"), *filters)
@@ -325,7 +326,8 @@ async def names_find_similar(
         # Check if metaphone codes match
         metaphone_match = name_metaphone == candidate_metaphone
 
-        # Also check Jaro-Winkler similarity for scientific names (good for genus/species prefixes)
+        # Also check Jaro-Winkler similarity for scientific names
+        # (good for genus/species prefixes)
         jaro_similarity = jellyfish.jaro_winkler_similarity(
             search_for_name.lower(), candidate.full_name.lower()
         )
@@ -354,9 +356,9 @@ async def names_find_similar(
     if phonetic_matches:
         return sorted(phonetic_matches, key=lambda x: x.similarity, reverse=True)[:30]
 
-    results = []
     sequence_matches: list[schemas.SimilarNameSearchResult] = []
-    # If no phonetic matches, fall back to pattern-based search with Levenshtein distance
+    # If no phonetic matches, fall back to pattern-based search with
+    # Levenshtein distance
 
     if len(name_splitted) < 2:
         search_str = f"{search_for_name}%"
@@ -423,11 +425,11 @@ async def names_find_similar(
     if lstein_matches:
         return sorted(lstein_matches, key=lambda x: x.similarity, reverse=True)[:3]
 
-    if not results:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Name '{search_for_name}' not found.",
-        )
+    # No matches found
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=f"Name '{search_for_name}' not found.",
+    )
 
 
 @app.get("/species/", response_model=schemas.TaxonSearchResults, tags=[Tag.NAME])

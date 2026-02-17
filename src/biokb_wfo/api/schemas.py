@@ -1,4 +1,3 @@
-from types import NoneType
 from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
