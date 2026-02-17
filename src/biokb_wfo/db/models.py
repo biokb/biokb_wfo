@@ -10,10 +10,22 @@ from biokb_wfo.constants import TABLE_PREFIX
 
 
 class Base(DeclarativeBase):
+    """Base class for all SQLAlchemy ORM models in the biokb_wfo database."""
+
     pass
 
 
 class RoleEnums(enum.Enum):
+    """Enumeration of possible taxonomic name roles.
+
+    Attributes:
+        ROLE: Generic role designation
+        ACCEPTED: Name is the accepted taxonomic name
+        UNPLACED: Name has not been placed in the taxonomy
+        SYNONYM: Name is a synonym of another name
+        DEPRECATED: Name is deprecated and should not be used
+    """
+
     ROLE = "role"
     ACCEPTED = "accepted"
     UNPLACED = "unplaced"
@@ -22,6 +34,21 @@ class RoleEnums(enum.Enum):
 
 
 class StatusEnums(enum.Enum):
+    """Enumeration of nomenclatural status values for taxonomic names.
+
+    Attributes:
+        VALID: Name is nomenclaturally valid
+        UNKNOWN: Status is unknown
+        INVALID: Name is nomenclaturally invalid
+        DEPRECATED: Name is deprecated
+        ILLEGITIMATE: Name is illegitimate under nomenclatural rules
+        REJECTED: Name has been formally rejected
+        ORTHOVAR: Orthographic variant
+        CONSERVED: Name has been formally conserved
+        SUPERFLUOUS: Name is superfluous (has a nomenclatural synonym)
+        SANCTIONED: Name has been sanctioned
+    """
+
     VALID = "valid"
     UNKNOWN = "unknown"
     INVALID = "invalid"
@@ -35,6 +62,43 @@ class StatusEnums(enum.Enum):
 
 
 class RankEnums(enum.Enum):
+    """Enumeration of taxonomic ranks.
+
+    Defines all possible taxonomic ranks from kingdom level down to
+    infraspecific ranks like variety and form.
+
+    Attributes:
+        CODE: Nomenclatural code designation
+        VARIETY: Botanical variety (var.)
+        SPECIES: Species rank
+        FORM: Botanical form (f.)
+        SUBSPECIES: Subspecies rank (subsp.)
+        UNRANKED: Unranked taxon
+        PROLE: Prole (botanical subgroup)
+        SUBVARIETY: Subvariety (subvar.)
+        LUSUS: Lusus (sport or aberrant form)
+        SUBFORM: Subform (subf.)
+        SECTION: Section (sect.)
+        SUBSERIES: Subseries
+        SERIES: Series (ser.)
+        SUBSECTION: Subsection (subsect.)
+        SUBGENUS: Subgenus (subg.)
+        GENUS: Genus rank
+        FAMILY: Family rank (ends in -aceae)
+        TRIBE: Tribe (ends in -eae)
+        SUBTRIBE: Subtribe (ends in -inae)
+        SUPERTRIBE: Supertribe
+        SUBFAMILY: Subfamily (ends in -oideae)
+        ORDER: Order rank (ends in -ales)
+        SUPERORDER: Superorder
+        SUBCLASS: Subclass (ends in -idae)
+        CLASS: Class rank
+        PHYLUM: Phylum/Division rank
+        KINGDOM: Kingdom rank
+        SUBORDER: Suborder
+        SUBKINGDOM: Subkingdom
+    """
+
     CODE = "code"
     VARIETY = "variety"
     SPECIES = "species"
@@ -67,6 +131,39 @@ class RankEnums(enum.Enum):
 
 
 class Name(Base):
+    """Central model representing a taxonomic name in the World Flora Online.
+
+    This model stores all information about a taxonomic name, including its
+    nomenclatural details, taxonomic placement, and relationships to taxonomic
+    hierarchy levels. Each name can be linked to various taxonomic ranks from
+    kingdom down to infraspecific levels.
+
+    Attributes:
+        id: Primary key, auto-incrementing integer
+        citation: Full citation of the name including author and publication
+        full_name: Complete formatted name with authors
+        full_name_no_authors: Name without author citations
+        full_name_plain: Plain text version without formatting
+        genus_string: Genus portion of the name
+        hybrid_taxon: Whether this represents a hybrid taxon
+        ipni: International Plant Names Index identifier
+        name: The name string itself
+        status: Nomenclatural status (from StatusEnums)
+        parent_id: Reference to parent taxon
+        year: Year of publication
+        rank: Taxonomic rank (from RankEnums)
+        role: Taxonomic role (from RoleEnums)
+        species_string: Species portion of the name
+
+        Foreign key relationships to taxonomic ranks:
+        code_id, species_id, genus_id, tribe_id, family_id, order_id,
+        phylum_id, subkingdom_id, kingdom_id, section_id, subgenus_id,
+        subspecies_id, variety_id, subtribe_id, form_id, suborder_id,
+        subclass_id, classification_id, subfamily_id, superorder_id,
+        series_id, subsection_id, supertribe_id, subvariety_id,
+        subseries_id, subform_id, prole_id
+    """
+
     __tablename__ = TABLE_PREFIX + "name"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -204,6 +301,16 @@ class Name(Base):
 
 
 class Code(Base):
+    """Nomenclatural code classification model.
+
+    Represents nomenclatural codes (e.g., ICN for plants, ICZN for animals).
+
+    Attributes:
+        id: Primary key
+        name: Name of the nomenclatural code
+        names: List of Name objects associated with this code
+    """
+
     __tablename__ = TABLE_PREFIX + "code"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -211,6 +318,16 @@ class Code(Base):
 
 
 class Species(Base):
+    """Species-rank taxonomic classification model.
+
+    Represents species-level taxa in the taxonomic hierarchy.
+
+    Attributes:
+        id: Primary key
+        name: Species name
+        names: List of Name objects associated with this species
+    """
+
     __tablename__ = TABLE_PREFIX + "species"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -218,6 +335,16 @@ class Species(Base):
 
 
 class Genus(Base):
+    """Genus-rank taxonomic classification model.
+
+    Represents genus-level taxa in the taxonomic hierarchy.
+
+    Attributes:
+        id: Primary key
+        name: Genus name
+        names: List of Name objects associated with this genus
+    """
+
     __tablename__ = TABLE_PREFIX + "genus"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -225,6 +352,16 @@ class Genus(Base):
 
 
 class Tribe(Base):
+    """Tribe-rank taxonomic classification model.
+
+    Represents tribe-level taxa in the taxonomic hierarchy.
+
+    Attributes:
+        id: Primary key
+        name: Tribe name (typically ends in -eae)
+        names: List of Name objects associated with this tribe
+    """
+
     __tablename__ = TABLE_PREFIX + "tribe"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -232,6 +369,16 @@ class Tribe(Base):
 
 
 class Family(Base):
+    """Family-rank taxonomic classification model.
+
+    Represents family-level taxa in the taxonomic hierarchy.
+
+    Attributes:
+        id: Primary key
+        name: Family name (typically ends in -aceae)
+        names: List of Name objects associated with this family
+    """
+
     __tablename__ = TABLE_PREFIX + "family"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -239,6 +386,16 @@ class Family(Base):
 
 
 class Order(Base):
+    """Order-rank taxonomic classification model.
+
+    Represents order-level taxa in the taxonomic hierarchy.
+
+    Attributes:
+        id: Primary key
+        name: Order name (typically ends in -ales)
+        names: List of Name objects associated with this order
+    """
+
     __tablename__ = TABLE_PREFIX + "order"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -246,6 +403,16 @@ class Order(Base):
 
 
 class Phylum(Base):
+    """Phylum/Division-rank taxonomic classification model.
+
+    Represents phylum or division-level taxa in the taxonomic hierarchy.
+
+    Attributes:
+        id: Primary key
+        name: Phylum/division name
+        names: List of Name objects associated with this phylum
+    """
+
     __tablename__ = TABLE_PREFIX + "phylum"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -253,6 +420,16 @@ class Phylum(Base):
 
 
 class Subkingdom(Base):
+    """Subkingdom-rank taxonomic classification model.
+
+    Represents subkingdom-level taxa in the taxonomic hierarchy.
+
+    Attributes:
+        id: Primary key
+        name: Subkingdom name
+        names: List of Name objects associated with this subkingdom
+    """
+
     __tablename__ = TABLE_PREFIX + "subkingdom"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -260,6 +437,16 @@ class Subkingdom(Base):
 
 
 class Kingdom(Base):
+    """Kingdom-rank taxonomic classification model.
+
+    Represents kingdom-level taxa in the taxonomic hierarchy.
+
+    Attributes:
+        id: Primary key
+        name: Kingdom name
+        names: List of Name objects associated with this kingdom
+    """
+
     __tablename__ = TABLE_PREFIX + "kingdom"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -267,6 +454,16 @@ class Kingdom(Base):
 
 
 class Section(Base):
+    """Section-rank taxonomic classification model.
+
+    Represents section-level taxa within a genus.
+
+    Attributes:
+        id: Primary key
+        name: Section name
+        names: List of Name objects associated with this section
+    """
+
     __tablename__ = TABLE_PREFIX + "section"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -274,6 +471,16 @@ class Section(Base):
 
 
 class Subgenus(Base):
+    """Subgenus-rank taxonomic classification model.
+
+    Represents subgenus-level taxa within a genus.
+
+    Attributes:
+        id: Primary key
+        name: Subgenus name
+        names: List of Name objects associated with this subgenus
+    """
+
     __tablename__ = TABLE_PREFIX + "subgenus"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -281,6 +488,16 @@ class Subgenus(Base):
 
 
 class Subspecies(Base):
+    """Subspecies-rank taxonomic classification model.
+
+    Represents subspecies-level infraspecific taxa.
+
+    Attributes:
+        id: Primary key
+        name: Subspecies name
+        names: List of Name objects associated with this subspecies
+    """
+
     __tablename__ = TABLE_PREFIX + "subspecies"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -288,6 +505,16 @@ class Subspecies(Base):
 
 
 class Variety(Base):
+    """Variety-rank taxonomic classification model.
+
+    Represents variety-level infraspecific taxa.
+
+    Attributes:
+        id: Primary key
+        name: Variety name
+        names: List of Name objects associated with this variety
+    """
+
     __tablename__ = TABLE_PREFIX + "variety"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -295,6 +522,16 @@ class Variety(Base):
 
 
 class Subtribe(Base):
+    """Subtribe-rank taxonomic classification model.
+
+    Represents subtribe-level taxa below tribe.
+
+    Attributes:
+        id: Primary key
+        name: Subtribe name (typically ends in -inae)
+        names: List of Name objects associated with this subtribe
+    """
+
     __tablename__ = TABLE_PREFIX + "subtribe"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -302,6 +539,16 @@ class Subtribe(Base):
 
 
 class Form(Base):
+    """Form-rank taxonomic classification model.
+
+    Represents form-level infraspecific taxa.
+
+    Attributes:
+        id: Primary key
+        name: Form name
+        names: List of Name objects associated with this form
+    """
+
     __tablename__ = TABLE_PREFIX + "form"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -309,6 +556,16 @@ class Form(Base):
 
 
 class Suborder(Base):
+    """Suborder-rank taxonomic classification model.
+
+    Represents suborder-level taxa below order.
+
+    Attributes:
+        id: Primary key
+        name: Suborder name
+        names: List of Name objects associated with this suborder
+    """
+
     __tablename__ = TABLE_PREFIX + "suborder"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -316,6 +573,16 @@ class Suborder(Base):
 
 
 class Subclass(Base):
+    """Subclass-rank taxonomic classification model.
+
+    Represents subclass-level taxa below class.
+
+    Attributes:
+        id: Primary key
+        name: Subclass name (typically ends in -idae)
+        names: List of Name objects associated with this subclass
+    """
+
     __tablename__ = TABLE_PREFIX + "subclass"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -323,6 +590,16 @@ class Subclass(Base):
 
 
 class Classification(Base):
+    """Classification system model.
+
+    Represents different classification systems or schemes used in taxonomy.
+
+    Attributes:
+        id: Primary key
+        name: Classification system name
+        names: List of Name objects associated with this classification
+    """
+
     __tablename__ = TABLE_PREFIX + "classification"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -330,6 +607,16 @@ class Classification(Base):
 
 
 class Subfamily(Base):
+    """Subfamily-rank taxonomic classification model.
+
+    Represents subfamily-level taxa below family.
+
+    Attributes:
+        id: Primary key
+        name: Subfamily name (typically ends in -oideae)
+        names: List of Name objects associated with this subfamily
+    """
+
     __tablename__ = TABLE_PREFIX + "subfamily"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -337,6 +624,16 @@ class Subfamily(Base):
 
 
 class Superorder(Base):
+    """Superorder-rank taxonomic classification model.
+
+    Represents superorder-level taxa above order.
+
+    Attributes:
+        id: Primary key
+        name: Superorder name
+        names: List of Name objects associated with this superorder
+    """
+
     __tablename__ = TABLE_PREFIX + "superorder"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -344,6 +641,16 @@ class Superorder(Base):
 
 
 class Series(Base):
+    """Series-rank taxonomic classification model.
+
+    Represents series-level taxa within a genus.
+
+    Attributes:
+        id: Primary key
+        name: Series name
+        names: List of Name objects associated with this series
+    """
+
     __tablename__ = TABLE_PREFIX + "series"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -351,6 +658,16 @@ class Series(Base):
 
 
 class Subsection(Base):
+    """Subsection-rank taxonomic classification model.
+
+    Represents subsection-level taxa below section.
+
+    Attributes:
+        id: Primary key
+        name: Subsection name
+        names: List of Name objects associated with this subsection
+    """
+
     __tablename__ = TABLE_PREFIX + "subsection"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -358,6 +675,16 @@ class Subsection(Base):
 
 
 class Supertribe(Base):
+    """Supertribe-rank taxonomic classification model.
+
+    Represents supertribe-level taxa above tribe.
+
+    Attributes:
+        id: Primary key
+        name: Supertribe name
+        names: List of Name objects associated with this supertribe
+    """
+
     __tablename__ = TABLE_PREFIX + "supertribe"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -365,6 +692,16 @@ class Supertribe(Base):
 
 
 class Subvariety(Base):
+    """Subvariety-rank taxonomic classification model.
+
+    Represents subvariety-level infraspecific taxa below variety.
+
+    Attributes:
+        id: Primary key
+        name: Subvariety name
+        names: List of Name objects associated with this subvariety
+    """
+
     __tablename__ = TABLE_PREFIX + "subvariety"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -372,6 +709,16 @@ class Subvariety(Base):
 
 
 class Subseries(Base):
+    """Subseries-rank taxonomic classification model.
+
+    Represents subseries-level taxa below series.
+
+    Attributes:
+        id: Primary key
+        name: Subseries name
+        names: List of Name objects associated with this subseries
+    """
+
     __tablename__ = TABLE_PREFIX + "subseries"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -379,6 +726,16 @@ class Subseries(Base):
 
 
 class Subform(Base):
+    """Subform-rank taxonomic classification model.
+
+    Represents subform-level infraspecific taxa below form.
+
+    Attributes:
+        id: Primary key
+        name: Subform name
+        names: List of Name objects associated with this subform
+    """
+
     __tablename__ = TABLE_PREFIX + "subform"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)
@@ -386,6 +743,16 @@ class Subform(Base):
 
 
 class Prole(Base):
+    """Prole-rank taxonomic classification model.
+
+    Represents prole-level infraspecific botanical taxa.
+
+    Attributes:
+        id: Primary key
+        name: Prole name
+        names: List of Name objects associated with this prole
+    """
+
     __tablename__ = TABLE_PREFIX + "prole"
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(Text)

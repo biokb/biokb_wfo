@@ -1,6 +1,5 @@
 """MySQL database importer module."""
 
-import json
 import logging
 import os
 import re
@@ -9,14 +8,13 @@ import urllib.request
 import zipfile
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import ijson
 import pandas as pd
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.session import Session
-from tqdm import tqdm
 
 from biokb_wfo.constants import (
     BASE_URL_DOWNLOAD,
@@ -85,10 +83,13 @@ class DbManager:
     ) -> Dict[str, int]:
         path = self.__download_data(force_download=force_download)
         self.__reset_database()
-        return self.__insert_data(path)
+        inserted = self.__insert_data(path)
+        if delete_files:
+            os.remove(path)
+        return inserted
 
     def __download_data(self, force_download: bool = False) -> str:
-        """Downloads chebi data from it's ftp server.
+        """Downloads wfo data.
 
         Args:
             redownload (bool, optional): If True, will force download the data, even if
@@ -120,17 +121,17 @@ class DbManager:
         return inserted_in_place_tables | inserted_names
 
     def __inserted_place_in_data(self, zip_path: str) -> Dict[str, int]:
-        data = defaultdict(set)
+        data: defaultdict[str, set] = defaultdict(set)
         file_name = Path(zip_path).name.split(".zip")[0]
 
-        logger.info(f"Inserting PLACE_IN_FIELDS data into database...")
+        logger.info("Inserting PLACE_IN_FIELDS data into database...")
         with zipfile.ZipFile(zip_path, "r") as z:
             with z.open(file_name) as f:
                 for item in ijson.items(f, "item"):
                     for key in [x for x in item.keys() if x in PLACE_IN_FIELDS]:
                         data[PLACE_IN_FIELDS[key]].add(item[key])
 
-        inserted_counts = {}
+        inserted_counts: dict[str, int] = {}
         for k in data:
             enum_data = enumerate(sorted(data[k]), start=1)
             self.cache_ids[k] = {x[1]: x[0] for x in list(enum_data)}
@@ -140,39 +141,40 @@ class DbManager:
                     "name": list(self.cache_ids[k].keys()),
                 }
             )
-            inserts = df.to_sql(
+            inserts: int | None = df.to_sql(
                 name=f"wfo_{k}",
                 con=self.__engine,
                 if_exists="append",
                 index=False,
             )
-            inserted_counts[k] = inserts
+            inserted_counts[k] = inserts if inserts is not None else 0
         return inserted_counts
 
     def __insert_names(self, zip_path: str) -> Dict[str, int]:
         file_name = Path(zip_path).name.split(".zip")[0]
-        rows = []
+        rows = []  # type: ignore
 
-        logger.info(f"Inserting names data into database...")
+        counter = 0
+        logger.info("Inserting names data into database...")
         with zipfile.ZipFile(zip_path, "r") as z:
             with z.open(file_name) as f:
-                counter = 0
+
                 for item in ijson.items(f, "item"):
                     counter += 1
                     if counter % 100000 == 0:
                         self.__insert_names_from_rows(rows)
                         rows = []
-                    row = {k: v for k, v in item.items() if k in self.mapper}
+                    row = {k: v for k, v in item.items() if k in self.mapper}  # type: ignore
                     rows.append(row)
                 if rows:
                     self.__insert_names_from_rows(rows)
         return {"name": counter}
 
-    def __insert_names_from_rows(self, rows):
+    def __insert_names_from_rows(self, rows: list[Dict[str, Any]]) -> int:
         """Insert names data into database."""
 
         df = pd.DataFrame(rows)
-        df: pd.DataFrame = df.rename(columns=self.mapper)
+        df = df.rename(columns=self.mapper)
         df["id"] = df["id"].str.replace("wfo-", "").astype(int)
         df["parent_id"] = (
             df["parent_id_temp"].str.extract(r"wfo-(\d+)-").astype("Int64")
@@ -186,11 +188,14 @@ class DbManager:
             df[f"{column}_id"] = df[column].map(self.cache_ids[column]).astype("Int64")
             df.drop(columns=[column], inplace=True)
 
-        df.to_sql(
-            name="wfo_name",
-            con=self.__engine,
-            if_exists="append",
-            index=False,
+        return (
+            df.to_sql(
+                name="wfo_name",
+                con=self.__engine,
+                if_exists="append",
+                index=False,
+            )
+            or 0
         )
 
 
@@ -206,7 +211,8 @@ def import_data(
         force_download (bool, optional): If True, will force download the data, even if
             files already exist. If False, it will skip the downloading part if files
             already exist locally. Defaults to False.
-        delete_files (bool, optional): If True, downloaded files are deleted after import.
+        delete_files (bool, optional): If True, downloaded files are
+                                       deleted after import.
             Defaults to False.
 
     Returns:
