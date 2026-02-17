@@ -13,7 +13,7 @@ from biokb_wfo.rdf.neo4j_importer import Neo4jImporter
 from biokb_wfo.rdf.turtle import TurtleCreator
 
 
-def setup_logging(ctx, param, value):
+def setup_logging(ctx: click.Context, param: click.Parameter, value: int) -> int:
     # Only set up logging if the user actually asks for it
     if value == 1:
         logging.getLogger("biokb_wfo").setLevel(logging.INFO)
@@ -33,7 +33,7 @@ def setup_logging(ctx, param, value):
 @click.group()
 @click.version_option(__version__)
 @click.option("-v", count=True, callback=setup_logging, expose_value=False)
-def main():
+def main() -> None:
     """Import in RDBMS, create turtle files and import into Neo4J.
 
     Please follow the steps:\n
@@ -68,7 +68,9 @@ def main():
     default=DB_DEFAULT_CONNECTION_STR,
     help=f"SQLAlchemy engine URL [default: {DB_DEFAULT_CONNECTION_STR}]",
 )
-def import_data(force_download: bool, delete_files: bool, connection_string: str):
+def import_data(
+    force_download: bool, delete_files: bool, connection_string: str
+) -> None:
     """Import data."""
     engine = create_engine(connection_string)
     DbManager(engine=engine).import_data(
@@ -85,7 +87,7 @@ def import_data(force_download: bool, delete_files: bool, connection_string: str
     default=DB_DEFAULT_CONNECTION_STR,
     help=f"SQLAlchemy engine URL [default: {DB_DEFAULT_CONNECTION_STR}]",
 )
-def create_ttls(connection_string: str):
+def create_ttls(connection_string: str) -> None:
     """Create TTL files from local database."""
     path_to_zip = TurtleCreator(create_engine(connection_string)).create_ttls()
     click.echo(
