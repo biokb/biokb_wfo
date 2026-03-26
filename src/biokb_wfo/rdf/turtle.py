@@ -100,11 +100,13 @@ class TurtleCreator:
                     models.Name.rank,
                     models.Name.parent_id,
                     models.Name.ipni,
+                    models.Name.role,
                 )
                 .where(
                     models.Name.status == "valid",
                     models.Name.parent_id.isnot(None),
                     models.Name.rank.isnot(None),
+                    models.Name.role.in_(["accepted", "synonym"])
                 )
                 .all()
             )
@@ -125,6 +127,13 @@ class TurtleCreator:
                         taxon_uri,
                         ns.REL_NS["rank"],
                         Literal(taxon.rank, datatype=XSD.string),
+                    )
+                )
+                graph.add(
+                    (
+                        taxon_uri,
+                        ns.REL_NS["role"],
+                        Literal(taxon.role, datatype=XSD.string),
                     )
                 )
                 if taxon.parent_id:
