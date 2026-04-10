@@ -1,9 +1,12 @@
 import logging
 import os
+from logging import Logger
 from typing import Optional
 
 import click
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
+from sqlalchemy.engine import Engine
 
 from biokb_wfo import __version__
 from biokb_wfo.api.main import run_api
@@ -11,6 +14,8 @@ from biokb_wfo.constants import DB_DEFAULT_CONNECTION_STR, NEO4J_URI, NEO4J_USER
 from biokb_wfo.db.manager import DbManager
 from biokb_wfo.rdf.neo4j_importer import Neo4jImporter
 from biokb_wfo.rdf.turtle import TurtleCreator
+
+logger: Logger = logging.getLogger("biokb_wfo")
 
 
 def setup_logging(ctx: click.Context, param: click.Parameter, value: int) -> int:
@@ -68,15 +73,41 @@ def main() -> None:
     default=DB_DEFAULT_CONNECTION_STR,
     help=f"SQLAlchemy engine URL [default: {DB_DEFAULT_CONNECTION_STR}]",
 )
+@click.option(
+    "-e",
+    "--env",
+    type=str,
+    default=None,
+    help="Environment file to load for configuration (default: None)",
+)
 def import_data(
-    force_download: bool, delete_files: bool, connection_string: str
+    force_download: bool,
+    delete_files: bool,
+    connection_string: str | None,
+    env: Optional[str] = None,
 ) -> None:
     """Import data."""
-    engine = create_engine(connection_string)
+    if env:
+        if connection_string:
+            logger.warning(
+                "Both environment file and connection string provided. Environment have priority."
+            )
+        if not os.path.exists(env):
+            logger.error("Environment file %s not found.", env)
+            return
+        load_dotenv(env, override=True)
+        connection_string = os.getenv("CONNECTION_STR")
+        if connection_string is None:
+            logger.warning(
+                "CONNECTION_STR environment variable not found. Using default connection string."
+            )
+
+    engine: Engine | None = (
+        create_engine(connection_string) if connection_string else None
+    )
     DbManager(engine=engine).import_data(
         force_download=force_download, delete_files=delete_files
     )
-    click.echo(f"Data imported successfully to {connection_string}")
 
 
 @main.command("create-ttls")
