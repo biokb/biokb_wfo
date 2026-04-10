@@ -1,8 +1,8 @@
 import logging
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Optional, Sequence, Type, TypeAlias, Union, get_args, get_origin
 from enum import Enum
+from typing import Optional, Sequence, Type, TypeAlias, Union, get_args, get_origin
 
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -94,7 +94,7 @@ def _build_dynamic_query(
             else:
                 filters.append(column == value)
 
-        elif issubclass(origin, Enum):
+        elif isinstance(origin, type) and issubclass(origin, Enum):
             filters.append(column == value)
 
         # FALLBACK .....................................................................
