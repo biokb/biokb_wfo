@@ -411,6 +411,8 @@ class NameFoundResult(BaseModel):
     status: str
     rank: str
     role: Optional[str] = None
+    year: Optional[int] = None
+    ipni: Optional[str] = None
     url: str
 
 

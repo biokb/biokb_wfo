@@ -4,7 +4,7 @@ import re
 import secrets
 from contextlib import asynccontextmanager
 from difflib import SequenceMatcher
-from typing import Annotated, AsyncGenerator, Generator, List
+from typing import Annotated, AsyncGenerator, Generator, List, Optional
 
 import jellyfish
 import Levenshtein
@@ -240,19 +240,62 @@ async def search_names(
     )
 
 
-@app.get("/name/first_hit/", response_model=schemas.NameFoundResult, tags=[Tag.NAME])
+@app.get(
+    "/name/first_hit/",
+    response_model=Optional[schemas.NameFoundResult],
+    tags=[Tag.NAME],
+)
 async def search_name_first_hit(
     names: list[str] = Query(
         ...,
         description="List of names to search for correct names",
         openapi_examples={
-            "example 1": {"value": ["Achila meliflium", "Almue Fera"]},
-            "example 2": {"value": ["Achillea millefolium", "Acer rubrum"]},
+            "example species": {
+                "value": ["Achillea millefolium", "Achillea millefolium L."]
+            },
+            "example subspecies": {
+                "value": [
+                    "Achillea millefolium alpestris",
+                    "Achillea millefolium subsp. alpestris",
+                    "Achillea millefolium subsp. alpestris (Wimm., Günther & Grab.) Gremli",
+                ]
+            },
+            "example invalid": {
+                "value": [
+                    "Cichorium commune",
+                ]
+            },
+            "example deprecated": {
+                "value": [
+                    "Hieracium debilescens",
+                ]
+            },
         },
+    ),
+    only_if_valid: bool = Query(
+        False,
+        description="If True, only return a result if the name is valid. "
+        "If False, tries first valid and then returns the first match regardless of status.",
     ),
     session: Session = Depends(get_session),
 ) -> schemas.NameFoundResult | None:
-    """"""
+    """Return the first matching name from a prioritized exact-match search.
+
+    The input names are normalized by trimming outer whitespace and collapsing
+    repeated internal whitespace. The function then checks each normalized name
+    in the order received and performs exact matches against three columns, in
+    this order: ``full_name_plain``, ``full_name_no_authors``, and
+    ``full_name``.
+
+    For each input name, the algorithm first searches for a record with
+    ``status == VALID``. If no valid record is found for that name, it repeats
+    the same column-by-column search among non-valid names, which allows
+    synonyms, deprecated names, or other non-accepted statuses to resolve.
+
+    As soon as a match is found, the search stops and the response is built
+    from that record, including the matched column name and the public WFO URL.
+    If none of the provided names match, the endpoint returns ``None``.
+    """
     url_template = "https://www.worldfloraonline.org/taxon/wfo-"
     names = [re.sub(r"\s+", " ", name.strip()) for name in names]
     result: models.Name | None = None
@@ -278,8 +321,8 @@ async def search_name_first_hit(
                 found_in = column.name
                 break
 
-        if not result:
-            # if no valid name found, try to get synonyms
+    if not result and not only_if_valid:
+        for name in names:
             for column in [
                 models.Name.full_name_plain,
                 models.Name.full_name_no_authors,
@@ -310,6 +353,8 @@ async def search_name_first_hit(
             status=result.status,
             rank=result.rank,
             role=result.role,
+            year=result.year,
+            ipni=result.ipni,
             url=url,
         )
     return found_name
