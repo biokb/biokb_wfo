@@ -204,3 +204,4 @@ __marimo__/
 notebooks/wfo.db
 notebooks/wfo.db.zip
 data
+.env_local

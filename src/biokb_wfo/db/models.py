@@ -171,7 +171,7 @@ class Name(Base):
     citation: Mapped[Optional[str]] = mapped_column(Text)
     full_name: Mapped[str] = mapped_column(String(255), index=True)
     full_name_no_authors: Mapped[str] = mapped_column(String(255), index=True)
-    full_name_plain: Mapped[Optional[str]] = mapped_column(String(255), index=True)
+    full_name_plain: Mapped[str] = mapped_column(String(255), index=True)
     genus_string: Mapped[Optional[str]] = mapped_column(String(255))
     hybrid_taxon: Mapped[Optional[bool]]
     ipni: Mapped[Optional[str]] = mapped_column(String(50), index=True)

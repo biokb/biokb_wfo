@@ -398,6 +398,22 @@ class NameSearchResults(BaseModel):
     results: list[NameWithRelationships]
 
 
+class NameFoundResult(BaseModel):
+    """Schema for Name responses"""
+
+    wfo_id: int
+    found_in: str
+    full_name: str
+    full_name_no_authors: str
+    full_name_plain: str
+    genus: Optional[str] = None
+    family: Optional[str] = None
+    status: str
+    rank: str
+    role: Optional[str] = None
+    url: str
+
+
 class Taxon(BaseModel):
     """Schema for Taxon responses with id and relationships"""
 

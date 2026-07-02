@@ -75,7 +75,7 @@ app = FastAPI(
     description=description,
     version="0.1.0",
     lifespan=lifespan,
-    root_path=os.environ.get("API_WFO_ROOT_PATH", "")
+    root_path=os.environ.get("API_WFO_ROOT_PATH", ""),
 )
 
 app.add_middleware(
@@ -229,7 +229,7 @@ async def search_names(
     session: Session = Depends(get_session),
 ) -> SASearchResults | dict[str, str]:
     """
-    Search compounds.
+    Search names.
     """
     return build_dynamic_query(
         search_obj=search,
@@ -238,6 +238,81 @@ async def search_names(
         limit=limit,
         offset=offset,
     )
+
+
+@app.get("/name/first_hit/", response_model=schemas.NameFoundResult, tags=[Tag.NAME])
+async def search_name_first_hit(
+    names: list[str] = Query(
+        ...,
+        description="List of names to search for correct names",
+        openapi_examples={
+            "example 1": {"value": ["Achila meliflium", "Almue Fera"]},
+            "example 2": {"value": ["Achillea millefolium", "Acer rubrum"]},
+        },
+    ),
+    session: Session = Depends(get_session),
+) -> schemas.NameFoundResult | None:
+    """"""
+    url_template = "https://www.worldfloraonline.org/taxon/wfo-"
+    names = [re.sub(r"\s+", " ", name.strip()) for name in names]
+    result: models.Name | None = None
+    found_in: str = "Not defined"
+    found_name: schemas.NameFoundResult | None = None
+
+    # first try to get valid names
+    for name in names:
+        for column in [
+            models.Name.full_name_plain,
+            models.Name.full_name_no_authors,
+            models.Name.full_name,
+        ]:
+            result = (
+                session.query(models.Name)
+                .filter(
+                    column == name,
+                    models.Name.status == models.StatusEnums.VALID.value,
+                )
+                .first()
+            )
+            if result:
+                found_in = column.name
+                break
+
+        if not result:
+            # if no valid name found, try to get synonyms
+            for column in [
+                models.Name.full_name_plain,
+                models.Name.full_name_no_authors,
+                models.Name.full_name,
+            ]:
+                result = (
+                    session.query(models.Name)
+                    .filter(
+                        column == name,
+                        models.Name.status != models.StatusEnums.VALID.value,
+                    )
+                    .first()
+                )
+                if result:
+                    found_in = column.name
+                    break
+    if isinstance(result, models.Name):
+        # if a valid name is found, return it as Name
+        url = f"{url_template}{result.id:010}"
+        found_name = schemas.NameFoundResult(
+            wfo_id=result.id,
+            found_in=found_in,
+            full_name=result.full_name,
+            full_name_no_authors=result.full_name_no_authors,
+            full_name_plain=result.full_name_plain,
+            genus=result.genus.name if result.genus else None,
+            family=result.family.name if result.family else None,
+            status=result.status,
+            rank=result.rank,
+            role=result.role,
+            url=url,
+        )
+    return found_name
 
 
 @app.get(
