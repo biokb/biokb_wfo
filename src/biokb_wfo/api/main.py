@@ -300,6 +300,7 @@ async def search_name_first_hit(
     names = [re.sub(r"\s+", " ", name.strip()) for name in names]
     result: models.Name | None = None
     found_in: str = "Not defined"
+    found_with_name: str = "Not defined"
     found_name: schemas.NameFoundResult | None = None
 
     # first try to get valid names
@@ -319,6 +320,7 @@ async def search_name_first_hit(
             )
             if result:
                 found_in = column.name
+                found_with_name = name
                 break
 
     if not result and not only_if_valid:
@@ -338,6 +340,7 @@ async def search_name_first_hit(
                 )
                 if result:
                     found_in = column.name
+                    found_with_name = name
                     break
     if isinstance(result, models.Name):
         # if a valid name is found, return it as Name
@@ -345,6 +348,7 @@ async def search_name_first_hit(
         found_name = schemas.NameFoundResult(
             wfo_id=result.id,
             found_in=found_in,
+            found_with_name=found_with_name,
             full_name=result.full_name,
             full_name_no_authors=result.full_name_no_authors,
             full_name_plain=result.full_name_plain,

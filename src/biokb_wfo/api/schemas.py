@@ -403,6 +403,7 @@ class NameFoundResult(BaseModel):
 
     wfo_id: int
     found_in: str
+    found_with_name: str
     full_name: str
     full_name_no_authors: str
     full_name_plain: str
