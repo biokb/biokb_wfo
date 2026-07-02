@@ -343,6 +343,19 @@ async def search_name_first_hit(
                     found_with_name = name
                     break
     if isinstance(result, models.Name):
+        # if no genus is found, try to get it from the name itself
+        genus = result.genus.name if result.genus else found_with_name.split(" ")[0]
+        # if no family is found, try to get it from the database using the genus
+        if not result.family:
+            f_result = (
+                session.query(models.Family.name)
+                .join(models.Name)
+                .filter(models.Name.genus == genus)
+                .first()
+            )
+            family = f_result[0] if f_result else None
+        else:
+            family = result.family.name
         # if a valid name is found, return it as Name
         url = f"{url_template}{result.id:010}"
         found_name = schemas.NameFoundResult(
@@ -352,8 +365,8 @@ async def search_name_first_hit(
             full_name=result.full_name,
             full_name_no_authors=result.full_name_no_authors,
             full_name_plain=result.full_name_plain,
-            genus=result.genus.name if result.genus else None,
-            family=result.family.name if result.family else None,
+            genus=genus,
+            family=family,
             status=result.status,
             rank=result.rank,
             role=result.role,
