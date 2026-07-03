@@ -438,6 +438,11 @@ async def names_find_similar(
         None,
         description="role",
     ),
+    first_x_letters: int = Query(
+        3,
+        minimum=1,
+        description="Number of first letters at the beginning of the name which have to be identical to the search name. This is used to reduce the number of candidates for similarity search.",
+    ),
 ) -> list[schemas.SimilarNameSearchResult] | None:
     """Find similar scientific names and return ranked similarity matches.
 
@@ -495,7 +500,7 @@ async def names_find_similar(
     # Latin scientific names
     # Also try Jaro-Winkler which works well for scientific names with shared prefixes
     name_metaphone = jellyfish.metaphone(search_for_name)
-    first_letter = search_for_name[0].upper()
+    first_letter = search_for_name[:first_x_letters]
 
     # Get names that start with same letter to reduce the dataset for
     # phonetic comparison
