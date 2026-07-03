@@ -269,6 +269,7 @@ class NameBase(BaseModel):
 class NameSearch(BaseModel):
     """Schema for updating a Name (all fields optional)"""
 
+    id: Optional[int] = None
     citation: Optional[str] = None
     full_name: Optional[str] = None
     full_name_no_authors: Optional[str] = None
@@ -360,6 +361,7 @@ class Name(NameBase):
 class NameWithRelationships(NameBase):
     """Schema for Name with nested taxonomy relationships"""
 
+    id: int
     code: Optional[Code] = None
     species: Optional[Species] = None
     genus: Optional[Genus] = None
