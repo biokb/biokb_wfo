@@ -448,13 +448,19 @@ class TaxonSearchResults(BaseModel):
 class SimilarNameSearchResult(BaseModel):
     """Schema for similarity search results"""
 
-    id: int
+    wfo_id: int
     full_name: str
+    full_name_no_authors: str
+    full_name_plain: str
+    genus: Optional[str] = None
+    family: Optional[str] = None
     status: str
     rank: str
-    role: str
+    role: Optional[str] = None
     year: Optional[int] = None
     ipni: Optional[str] = None
+    status: str
+    url: str
     calculate_with: Literal[
         "exact", "levenshtein", "metaphone_jaro", "sequence_matcher"
     ]

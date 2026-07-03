@@ -439,6 +439,16 @@ async def names_find_similar(
         description="role",
     ),
 ) -> list[schemas.SimilarNameSearchResult] | None:
+    """Find similar scientific names and return ranked similarity matches.
+
+    The response items follow ``schemas.SimilarNameSearchResult`` and include:
+    ``wfo_id``, ``full_name``, ``full_name_no_authors``, ``full_name_plain``,
+    optional ``genus`` and ``family``, ``status``, ``rank``, optional ``role``,
+    optional ``year`` and ``ipni``, public ``url``, ``calculate_with`` strategy,
+    and numeric ``similarity`` in the [0.0, 1.0] range.
+    """
+
+    url_template = "https://www.worldfloraonline.org/taxon/wfo-"
 
     search_for_name = re.sub(r"\s+", " ", search_for_name.strip())
     name_splitted: List[str] = [x.strip() for x in search_for_name.split(" ")]
@@ -462,13 +472,18 @@ async def names_find_similar(
         for exact_result in exact_results:
             return_values.append(
                 schemas.SimilarNameSearchResult(
-                    id=exact_result.id,
+                    wfo_id=exact_result.id,
                     full_name=exact_result.full_name,
+                    full_name_no_authors=exact_result.full_name_no_authors,
+                    full_name_plain=exact_result.full_name_plain,
+                    genus=exact_result.genus.name if exact_result.genus else None,
+                    family=exact_result.family.name if exact_result.family else None,
                     status=exact_result.status,
                     role=exact_result.role,
                     rank=exact_result.rank,
                     year=exact_result.year,
                     ipni=exact_result.ipni,
+                    url=f"{url_template}{exact_result.id:010}",
                     calculate_with="exact",
                     similarity=1.0,
                 )
@@ -513,13 +528,18 @@ async def names_find_similar(
 
             if final_similarity > 0.5:
                 phonetic_match = schemas.SimilarNameSearchResult(
-                    id=candidate.id,
+                    wfo_id=candidate.id,
                     full_name=candidate.full_name,
+                    full_name_no_authors=candidate.full_name_no_authors,
+                    full_name_plain=candidate.full_name_plain,
+                    genus=candidate.genus.name if candidate.genus else None,
+                    family=candidate.family.name if candidate.family else None,
                     status=candidate.status,
                     role=candidate.role,
                     rank=candidate.rank,
                     year=candidate.year,
                     ipni=candidate.ipni,
+                    url=f"{url_template}{candidate.id:010}",
                     calculate_with="metaphone_jaro",
                     similarity=round(final_similarity, 2),
                 )
@@ -548,13 +568,18 @@ async def names_find_similar(
         if ratio > 0.3:  # Threshold for similarity
             sequence_matches.append(
                 schemas.SimilarNameSearchResult(
-                    id=result.id,
+                    wfo_id=result.id,
                     full_name=result.full_name,
+                    full_name_no_authors=result.full_name_no_authors,
+                    full_name_plain=result.full_name_plain,
+                    genus=result.genus.name if result.genus else None,
+                    family=result.family.name if result.family else None,
                     status=result.status,
                     rank=result.rank,
                     year=result.year,
                     ipni=result.ipni,
                     role=result.role,
+                    url=f"{url_template}{result.id:010}",
                     calculate_with="sequence_matcher",
                     similarity=round(ratio, 2),
                 )
@@ -579,13 +604,18 @@ async def names_find_similar(
         if ratio > 0.3:
             lstein_matches.append(
                 schemas.SimilarNameSearchResult(
-                    id=result.id,
+                    wfo_id=result.id,
                     full_name=result.full_name,
+                    full_name_no_authors=result.full_name_no_authors,
+                    full_name_plain=result.full_name_plain,
+                    genus=result.genus.name if result.genus else None,
+                    family=result.family.name if result.family else None,
                     status=result.status,
                     role=result.role,
                     rank=result.rank,
                     year=result.year,
                     ipni=result.ipni,
+                    url=f"{url_template}{result.id:010}",
                     calculate_with="levenshtein",
                     similarity=round(ratio, 2),
                 )
