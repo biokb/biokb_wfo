@@ -9,12 +9,12 @@ from typing import Annotated, AsyncGenerator, Generator, List, Optional
 import jellyfish
 import Levenshtein
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-from sqlalchemy import Engine, create_engine, or_
-from sqlalchemy.orm import Session
+from sqlalchemy import Engine, create_engine, or_, select
+from sqlalchemy.orm import Session, sessionmaker
 
 from biokb_wfo.api import schemas
 from biokb_wfo.api.query_tools import SASearchResults, build_dynamic_query
@@ -42,13 +42,25 @@ PASSWORD: str = os.environ.get("WFO_API_PASSWORD", "admin")
 
 def get_engine() -> Engine:
     conn_url = os.environ.get("CONNECTION_STR", DB_DEFAULT_CONNECTION_STR)
-    engine: Engine = create_engine(conn_url)
+    # Keep pool healthy in long-running services and recycle before MySQL closes idles.
+    engine: Engine = create_engine(
+        conn_url,
+        pool_pre_ping=True,
+        pool_recycle=int(os.environ.get("DB_POOL_RECYCLE", "1800")),
+        pool_size=int(os.environ.get("DB_POOL_SIZE", "10")),
+        max_overflow=int(os.environ.get("DB_POOL_MAX_OVERFLOW", "20")),
+        pool_timeout=int(os.environ.get("DB_POOL_TIMEOUT", "30")),
+    )
     return engine
 
 
-def get_session() -> Generator[Session, None, None]:
-    engine: Engine = get_engine()
-    session = Session(bind=engine)
+def create_session_factory(engine: Engine) -> sessionmaker[Session]:
+    return sessionmaker(bind=engine, class_=Session, expire_on_commit=False)
+
+
+def get_session(request: Request) -> Generator[Session, None, None]:
+    session_factory: sessionmaker[Session] = request.app.state.session_factory
+    session = session_factory()
     try:
         yield session
     finally:
@@ -59,10 +71,11 @@ def get_session() -> Generator[Session, None, None]:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize app resources on startup and cleanup on shutdown."""
     engine = get_engine()
+    app.state.engine = engine
+    app.state.session_factory = create_session_factory(engine)
     manager.DbManager(engine)
     yield
-    # Clean up resources if needed
-    pass
+    app.state.engine.dispose()
 
 
 description = (
@@ -310,19 +323,18 @@ async def search_name_first_hit(
             models.Name.full_name_no_authors,
             models.Name.full_name,
         ]:
-            result = (
-                session.query(models.Name)
-                .filter(
+            result = session.scalars(
+                select(models.Name).where(
                     column == name,
                     models.Name.status == models.StatusEnums.VALID.value,
                 )
-                .first()
-            )
+            ).first()
             if result:
                 found_in = column.name
                 found_with_name = name
                 break
 
+    # if no valid name is found, try to get any name (valid or not)
     if not result and not only_if_valid:
         for name in names:
             for column in [
@@ -330,32 +342,54 @@ async def search_name_first_hit(
                 models.Name.full_name_no_authors,
                 models.Name.full_name,
             ]:
-                result = (
-                    session.query(models.Name)
-                    .filter(
+                result = session.scalars(
+                    select(models.Name).where(
                         column == name,
                         models.Name.status != models.StatusEnums.VALID.value,
                     )
-                    .first()
-                )
+                ).first()
                 if result:
                     found_in = column.name
                     found_with_name = name
                     break
     if isinstance(result, models.Name):
         # if no genus is found, try to get it from the name itself
-        genus = result.genus.name if result.genus else found_with_name.split(" ")[0]
-        # if no family is found, try to get it from the database using the genus
-        if not result.family:
-            f_result = (
-                session.query(models.Family.name)
-                .join(models.Name)
-                .filter(models.Name.genus == genus)
-                .first()
-            )
-            family = f_result[0] if f_result else None
-        else:
-            family = result.family.name
+        family = result.family.name if result.family else None
+        genus = result.genus.name if result.genus else None
+        if result.rank in [
+            models.RankEnums.SPECIES.value,
+            models.RankEnums.SUBSPECIES.value,
+            models.RankEnums.VARIETY.value,
+            models.RankEnums.SUBVARIETY.value,
+            models.RankEnums.FORM.value,
+            models.RankEnums.SUBFORM.value,
+            models.RankEnums.GENUS.value,
+            models.RankEnums.SUBGENUS.value,
+            models.RankEnums.SECTION.value,
+            models.RankEnums.SUBSECTION.value,
+            models.RankEnums.SERIES.value,
+            models.RankEnums.SUBSERIES.value,
+        ] and (not genus or not family):
+            if not genus:
+                genus = found_with_name.split(" ")[0]
+            # if no family is found, try to get it from the database using the genus
+            if not family:
+                family = session.scalar(
+                    select(models.Family.name)
+                    .join(
+                        models.Name, onclause=models.Family.id == models.Name.family_id
+                    )
+                    .join(
+                        models.Genus, onclause=models.Name.genus_id == models.Genus.id
+                    )
+                    .where(
+                        models.Genus.name == genus,
+                        models.Name.family_id.isnot(None),
+                        models.Name.status == models.StatusEnums.VALID.value,
+                        models.Name.rank == models.RankEnums.GENUS.value,
+                    )
+                )
+
         # if a valid name is found, return it as Name
         url = f"{url_template}{result.id:010}"
         found_name = schemas.NameFoundResult(
@@ -414,11 +448,11 @@ async def names_find_similar(
     filters += [models.Name.rank == rank.value] if rank else []
     filters += [models.Name.role == role.value] if role else []
 
-    exact_results = (
-        session.query(models.Name)
-        .where(models.Name.full_name_plain.like(search_for_name), *filters)
-        .all()
-    )
+    exact_results = session.scalars(
+        select(models.Name).where(
+            models.Name.full_name_plain.like(search_for_name), *filters
+        )
+    ).all()
 
     # First, check for exact match
     # If an exact match is found, return it immediately.
@@ -450,11 +484,11 @@ async def names_find_similar(
 
     # Get names that start with same letter to reduce the dataset for
     # phonetic comparison
-    candidates: List[models.Name] = (
-        session.query(models.Name)
-        .where(models.Name.full_name_plain.like(f"{first_letter}%"), *filters)
-        .all()
-    )
+    candidates = session.scalars(
+        select(models.Name).where(
+            models.Name.full_name_plain.like(f"{first_letter}%"), *filters
+        )
+    ).all()
 
     # Filter candidates by Metaphone similarity and Jaro-Winkler
     phonetic_matches: list[schemas.SimilarNameSearchResult] = []
@@ -503,11 +537,9 @@ async def names_find_similar(
     else:
         search_str = f"{name_splitted[0]}% {name_splitted[1]}%"
 
-    results: List[models.Name] = (
-        session.query(models.Name)
-        .where(models.Name.full_name.like(search_str), *filters)
-        .all()
-    )
+    results = session.scalars(
+        select(models.Name).where(models.Name.full_name.like(search_str), *filters)
+    ).all()
 
     # check for similarity
 
@@ -532,17 +564,15 @@ async def names_find_similar(
 
     # if no results sequence_matcher
     lstein_matches: list[schemas.SimilarNameSearchResult] = []
-    results = (
-        session.query(models.Name)
-        .where(
+    results = session.scalars(
+        select(models.Name).where(
             or_(
                 models.Name.full_name.like(f"{search_for_name[0]}%"),
                 models.Name.full_name.like(f"%{search_for_name[-4:]}"),
             ),
             *filters,
         )
-        .all()
-    )
+    ).all()
 
     for result in results:
         ratio = Levenshtein.ratio(search_for_name, result.full_name)
