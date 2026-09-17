@@ -83,6 +83,9 @@ tests = [
 [project.scripts]
 biokb_wfo = "biokb_wfo.cli:main"
 
+[tool.ruff.lint]
+ignore = ["UP045"]
+
 [tool.isort]
 profile = "black"
 line_length = 88
