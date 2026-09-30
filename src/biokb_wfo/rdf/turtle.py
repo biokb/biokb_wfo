@@ -106,13 +106,13 @@ class TurtleCreator:
                     models.Name.status == "valid",
                     models.Name.parent_id.isnot(None),
                     models.Name.rank.isnot(None),
-                    models.Name.role.in_(["accepted", "synonym"])
+                    models.Name.role.in_(["accepted", "synonym"]),
                 )
                 .all()
             )
             for taxon in tqdm(taxa):
                 taxon_uri = ns.WFO_NS[str(taxon.id).zfill(10)]
-                graph.add((taxon_uri, RDF.type, ns.NODE_NS[taxon.rank.capitalize()]))
+                graph.add((taxon_uri, RDF.type, ns.NODE_NS["Taxon"]))
                 graph.add((taxon_uri, RDF.type, ns.NODE_NS[BASIC_NODE_LABEL]))
 
                 graph.add(
