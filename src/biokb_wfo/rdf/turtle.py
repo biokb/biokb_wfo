@@ -143,13 +143,6 @@ class TurtleCreator:
                         Literal(taxon.role, datatype=XSD.string),
                     )
                 )
-                graph.add(
-                    (
-                        taxon_uri,
-                        ns.REL_NS["identifier"],
-                        Literal(taxon.id, datatype=XSD.integer),
-                    )
-                )
                 if taxon.parent_id:
                     parent_uri = ns.WFO_NS[str(taxon.parent_id).zfill(10)]
                     graph.add((taxon_uri, ns.REL_NS["HAS_PARENT"], parent_uri))
