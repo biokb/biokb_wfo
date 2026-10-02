@@ -27,7 +27,6 @@ logger: logging.Logger = logging.getLogger(name=__name__)
 
 
 class Neo4jImporter:
-
     def __init__(
         self,
         neo4j_uri: str | None = None,
@@ -69,7 +68,7 @@ class Neo4jImporter:
                 DETACH DELETE n
                 }} IN TRANSACTIONS OF 1000 ROWS;"""
             cypher = cast(LiteralString, cypher)  # type: ignore
-            session.run(cypher)
+            session.run(cypher).consume()
 
     def _set_test_driver(self, driver: Driver) -> None:
         """Overwrite the Neo4j driver. Mainly for testing purposes.

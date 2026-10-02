@@ -118,6 +118,13 @@ class TurtleCreator:
                 graph.add(
                     (
                         taxon_uri,
+                        ns.REL_NS["id"],
+                        Literal(taxon.id, datatype=XSD.integer),
+                    )
+                )
+                graph.add(
+                    (
+                        taxon_uri,
                         ns.REL_NS["name"],
                         Literal(taxon.full_name, datatype=XSD.string),
                     )
